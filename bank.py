@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+
 class BankAccount:
     def __init__(self, owner, balance):
         self.owner = owner
@@ -7,19 +9,24 @@ class BankAccount:
 
     def deposit(self, amount):
         self.balance += amount
-        self.history.append(f" Пополнение: + {amount}")
+        time_now = datetime.now().strftime("%d.%m.%Y %H:%M")
+        self.history.append(f"{time_now} Пополнение: + {amount}")
+
         print()
         print(f"Баланс обновлен: {self.balance}")
-        print(f"Пополнение на: {amount}")
+        print(f"{time_now} Пополнение на: + {amount}")
 
 
     def withdraw(self, amount):
+        time_now = datetime.now().strftime("%d.%m.%Y %H:%M")
         if self.balance < amount:
+            print()
             print("Недостаточно средств")
+            print(f"На вашем балансе: {self.balance}")
         else:
             self.balance -= amount
-            self.history.append(f"Снятие: - {amount}")
-            print("Средства сняты")
+            self.history.append(f"{time_now} Снятие: - {amount}")
+            print(f"{time_now} Средства сняты")
 
 
     def show_balance(self):
@@ -51,22 +58,28 @@ else:
 
 
 while True:
-    print("\n=== Банк ===")
-    print("1. Пополнить счёт")
-    print("2. Снять деньги")
+    print("\n*** Wallet ***")
+    print("1. Пополнение")
+    print("2. Снятие")
     print("3. Показать баланс")
     print("4. Выйти")
     print("5. История операций")
 
 
-    choice = input("Выберите: ")
+    choice = input("Выберите команду: ")
 
     if choice == "1":
-        x = int(input("Введите сумму пополнения: "))
-        user.deposit(x)
+        try:
+            x = int(input("Введите сумму пополнения: "))
+            user.deposit(x)
+        except ValueError:
+            print("Ошибка! Введите число.")
     elif choice == "2":
-        x = int(input("Введите сумму снятия: "))
-        user.withdraw(x)
+        try:
+            x = int(input("Введите сумму снятия: "))
+            user.withdraw(x)
+        except ValueError:
+            print("Ошибка! Введите число.")
     elif choice == "3":
         user.show_balance()
     elif choice == "4":
@@ -74,6 +87,8 @@ while True:
         print("Данные сохранены в bank.txt")
         break
     elif choice == "5":
+        print()
+        print("*** История операций ***")
         for record in user.history:
             print(record)
 
