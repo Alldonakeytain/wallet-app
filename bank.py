@@ -1,5 +1,26 @@
-import os
 from datetime import datetime
+import sqlite3
+
+conn = sqlite3.connect("bank.db")
+cursor = conn.cursor()
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL, 
+        balance INTEGER DEFAULT 0
+    )
+""")
+
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner TEXT NOT NULL,
+        record TEXT NOT NULL
+    )
+""")
+
+conn.commit()
 
 users = {}
 current_user = None
@@ -8,6 +29,8 @@ current_user = None
 def create_user(users):
     name = input("Введите имя: ").strip()
     users[name] = BankAccount(name, 0)
+    cursor.execute("INSERT INTO users (name, balance) VALUES (?, ?)", (name, 0))
+    conn.commit()
     return name
 
 class BankAccount:
@@ -45,7 +68,7 @@ class BankAccount:
             self.history.append(f"{time_now} Перевод: - {amount}")
             recipient.history.append(f"{time_now} Получен перевод: + {amount}")
 
-            recipient.save_to_file()
+            recipient.save_to_db()
         else:
             print("Недостаточно средств!")
 
@@ -53,21 +76,24 @@ class BankAccount:
     def show_balance(self):
         print(f"Текущий баланс: {self.balance}")
 
-    def save_to_file(self):
-        with open(f"{self.owner}.txt", "w", encoding="utf-8") as f:
-            f.write(f"Владелец: {self.owner}\n")
-            f.write(f"Баланс: {self.balance}\n")
-            f.write("История:\n")
-            for record in self.history:
-                f.write(record + "\n")
 
-    def load_from_file(self):
-        with open(f"{self.owner}.txt", "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            self.balance = int(lines[1].split(": ")[1])
-            self.history = []
-            for line in lines[3:]:
-                self.history.append(line.strip())
+    def save_to_db(self):
+        cursor.execute("UPDATE users SET balance = ? WHERE name = ?", (self.balance, self.owner))
+        for record in self.history:
+            cursor.execute("INSERT INTO history (owner, record) VALUES (?, ?)", (self.owner, record))
+
+        conn.commit()
+
+
+    def load_from_db(self):
+        cursor.execute("SELECT balance FROM users WHERE name = ?", (self.owner,))
+        row = cursor.fetchone()
+        self.balance = row[0]
+
+        cursor.execute("SELECT * FROM history WHERE owner = ?", (self.owner,))
+        rows = cursor.fetchall()
+        self.history = [row[2] for row in rows]
+
 
 while True:
     print("*** Добро пожаловать ***")
@@ -77,11 +103,12 @@ while True:
     choice = input("Выберите команду: ")
     if choice == "1":
         name = input("Введите имя: ").strip()
-        if name in users or os.path.exists(f"{name}.txt"):
+        cursor.execute("SELECT * FROM users WHERE name = ?", (name,))
+        if cursor.fetchone():
             if name not in users:
                 users[name] = BankAccount(name, 0)
             current_user = users[name]
-            current_user.load_from_file()
+            current_user.load_from_db()
         else:
             print("Пользователь не найден!")
             print()
@@ -112,7 +139,7 @@ while True:
             elif choice == "3":
                 current_user.show_balance()
             elif choice == "4":
-                current_user.save_to_file()
+                current_user.save_to_db()
                 print("Данные сохранены.")
                 break
             elif choice == "5":
@@ -123,9 +150,10 @@ while True:
             elif choice == "6":
                 print()
                 rec_name = input(f"Имя получателя: ").strip()
-                if os.path.exists(f"{rec_name}.txt"):
+                cursor.execute("SELECT * FROM users WHERE name = ?", (rec_name,))
+                if cursor.fetchone():
                     recipient = BankAccount(rec_name, 0)
-                    recipient.load_from_file()
+                    recipient.load_from_db()
                     amount = int(input("Сумма перевода: "))
                     current_user.transfer(amount, recipient)
                 else:
@@ -161,7 +189,7 @@ while True:
             elif choice == "3":
                 current_user.show_balance()
             elif choice == "4":
-                current_user.save_to_file()
+                current_user.save_to_db()
                 print("Данные сохранены.")
                 break
             elif choice == "5":
@@ -172,9 +200,10 @@ while True:
             elif choice == "6":
                 print()
                 rec_name = input("Имя получателя: ").strip()
-                if os.path.exists(f"{rec_name}.txt"):
+                cursor.execute("SELECT * FROM users WHERE name = ?", (rec_name,))
+                if cursor.fetchone():
                     recipient = BankAccount(rec_name, 0)
-                    recipient.load_from_file()
+                    recipient.load_from_db()
                     amount = int(input("Сумма перевода: "))
                     current_user.transfer(amount, recipient)
                 else:
