@@ -8,7 +8,8 @@ cursor.execute("""
     CREATE TABLE IF NOT EXISTS users(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL, 
-        balance INTEGER DEFAULT 0
+        balance INTEGER DEFAULT 0,
+        password TEXT NOT NULL
     )
 """)
 
@@ -22,18 +23,12 @@ cursor.execute("""
 
 conn.commit()
 
-def create_user(users):
-    name = input("Введите имя: ").strip()
-    users[name] = BankAccount(name, 0)
-    cursor.execute("INSERT INTO users (name, balance) VALUES (?, ?)", (name, 0))
-    conn.commit()
-    return name
-
 class BankAccount:
-    def __init__(self, owner, balance=0):
+    def __init__(self, owner, balance=0, password=""):
         self.owner = owner
         self.balance = balance
         self.history = []
+        self.password = password
 
     def deposit(self, amount):
         if amount <= 0:
@@ -82,10 +77,11 @@ class BankAccount:
         conn.commit()
 
     def load_from_db(self):
-        cursor.execute("SELECT balance FROM users WHERE name = ?", (self.owner,))
+        cursor.execute("SELECT balance, password FROM users WHERE name = ?", (self.owner,))
         row = cursor.fetchone()
         if row:
             self.balance = row[0]
+            self.password = row[1]
 
         cursor.execute("SELECT * FROM history WHERE owner = ?", (self.owner,))
         rows = cursor.fetchall()
@@ -94,11 +90,12 @@ class BankAccount:
 
 def create_user():
     name = input("Введите имя для регистрации: ").strip()
+    password = input("Введите пароль: ").strip()
     try:
-        cursor.execute("INSERT INTO users (name, balance) VALUES (?, ?)", (name, 0))
+        cursor.execute("INSERT INTO users (name, balance, password) VALUES (?, ?, ?)", (name, 0, password))
         conn.commit()
         print(f"Пользователь {name} успешно зарегистрирован!")
-        return BankAccount(name, 0)
+        return BankAccount(name, 0, password)
     except sqlite3.IntegrityError:
         print("Пользователь с таким именем уже существует!")
         return None
@@ -166,16 +163,21 @@ while True:
    print("1. Войти в аккаунт")
    print("2. Регистрация нового пользователя")
    print("3. Выйти из системы")
+   print("4. Показать список пользователей")
 
    main_choice = input("Выберите команду: ")
 
    if main_choice == "1":
        name = input("Введите имя: ").strip()
+       input_password = input("Введите пароль: ").strip()
        cursor.execute("SELECT * FROM users WHERE name = ?", (name,))
        if cursor.fetchone():
            user = BankAccount(name)
            user.load_from_db()
-           user_menu(user)
+           if input_password == user.password:
+               user_menu(user)
+           else:
+               print("Пароль не верный!")
        else:
            print("Пользователь не найден!")
 
@@ -187,6 +189,16 @@ while True:
    elif main_choice == "3":
        print("Программа завершена.")
        break
+
+   elif main_choice == "4":
+       print("\nСписок всех пользователей:")
+       cursor.execute("SELECT name FROM users")
+       users = cursor.fetchall()
+       if users:
+           for index, user in enumerate(users, start=1):
+               print(f"{index}. {user[0]}")
+       else:
+           print("Пользователей нет!")
 
 conn.close()
 
